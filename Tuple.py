@@ -6,4 +6,3 @@ class TupleObject:
             csvHandler = reader(handler)
 
             self.list = list(csvHandler)
-            print(self.list)

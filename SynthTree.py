@@ -8,6 +8,8 @@ global Negative
 
 Positive = []
 Negative = []
+
+
 class Variable(Enum):
     X = 0
     Y = 1
@@ -16,141 +18,159 @@ class Variable(Enum):
 
 # category number that was used to previously dig
 previously_used = {}
-class classifier:
-    def __init__(self):
-        self.positive = []
-        self.negative = []
+
+
 
 class DTree:
-    def __init__(self, data, maxDepth, parentDepth, binSize, datasetLength):
+    def __init__(self, data, maxDepth, parentDepth, datasetLength, boundaries, Parent):
         self.thisData = deepcopy(data)
         self.maxDepth = maxDepth
         self.depth = 1 + parentDepth
+        self.boundaries = boundaries
 
         self.indexDiscriminated = -1
         self.entropy = -(math.inf)
-
+        self.gain = -(math.inf)
         # True, False
         self.classifiedAs = None
-
         self.Leaf = False
-        self.bin = None
-
+        self.Parent = Parent
+        self.isBinary = False
         self.children = []
-        self.binBoundaries = []
-        self.bin = data
 
         if self.depth == maxDepth:
             self.Leaf = True
-            # calculateEntropy(self.bin, datasetLength)
             self.classify(datasetLength)
+            return
         else:
-            self.discriminate(self.thisData, binSize, datasetLength)
-            self.entropy = calculateEntropy(self.thisData, datasetLength)
-            self.calculateInformationGain(self.thisData, datasetLength)
+            self.determineEntropy(datasetLength)
+            self.detectBinary(datasetLength)
+            self.Expand(datasetLength, self.depth)
+            
+    def detectBinary(self, dataSetLength):
+        counter = 0
+        for i in range(len(self.thisData)):
+            if int(self.thisData[i][self.indexDiscriminated]) != 1 or abs(int(self.thisData[i][self.indexDiscriminated])) != 0 :
+                counter = counter + float(self.thisData[i][self.indexDiscriminated])
+        
+        if counter == 0:
+            self.isBinary == True
+        
 
     def classify(self, datasetLength):
-        TrueVal = calculateProbability(self.bin, datasetLength, True)
-        FalseVal = calculateProbability(self.bin, datasetLength, False)
+        count = 0
+        for i in self.thisData:
+            if int(i[datasetLength-1]) == 1:
+                count += 1
 
-        if TrueVal >= FalseVal:
-            self.classifiedAs = "+"
-        else:
-            self.classifiedAs = "-"
+        try:
+            ratio = count / len(self.thisData)
 
-    def calculateInformationGain(self, data, datasetLength):
-        childEntropies = []
+            if ratio >= .5:
+                self.classifiedAs = 1
+            else:
+                self.classifiedAs = 0
+        except:
+            self.classifiedAs = self.Parent.classifiedAs
 
-        for i in range(len(self.children)):
-            variable = calculateEntropy(deepcopy(self.children[i].bin), datasetLength)
-            childEntropies.append(variable)
-
-    def binaryDiscriminate(self, theData, discriminator):
-        previously_used[discriminator] = 1
-        Negative = []
-        Positive = []
-        for i in range(2):
-            for j in range(len(theData)):
-                if theData[j][discriminator] == 1:
-                    Positive.append(deepcopy(theData[j]))
-                else:
-                    Negative.append(deepcopy(theData[j]))
-        self.children.append(Negative)
-        self.children.append(Positive)
-
-    def discriminate(self, theData, binSize, datasetLength):
-        localDiscriminator = -1
-        localDifference = 0
-        for i in range(datasetLength - 1):
-            # skip it if it's been used before
-            if i in previously_used:
-                if previously_used[i] == 1:
-                    continue
-
-            localmax = -math.inf
-            localmax = math.inf
-
-            theData.sort(key=operator.itemgetter(i))
-            localmax = float(theData[len(theData) - 1][i])
-            localmin = float(theData[0][i])
-
-            localCheck = abs(localmax - localmin)
-
-            if (localCheck > localDifference):
-                localDiscriminator = i
-
-        if (float(localCheck) == 1.0):
-            self.binBoundaries.append(0)
-            self.binBoundaries.append(1)
-
-            self.binaryDiscriminate(theData, localDiscriminator)
+    def Expand(self, datasetLength, parentDepth):
+        if self.isBinary == True:
+            for i in range(2):
+                for j in range(len(self.thisData)):
+                    if int(self.thisData[j][self.indexDiscriminated]) == 1:
+                        Positive.append(deepcopy(self.thisData[j]))
+                    else:
+                        Negative.append(deepcopy(self.thisData[j]))
+            self.children.append(DTree(deepcopy(Negative),self.maxDepth, self.depth, len(Negative[0]), self.boundaries, self))
+            self.children.append(DTree(deepcopy(Positive),self.maxDepth, self.depth, len(Positive[0]), self.boundaries, self))
             return
-
-        boundary = len(theData) / binSize
-        localBin = binSize - 1
-
-        for i in range(localBin):
-            self.binBoundaries.append(int(math.ceil(boundary * (i + 1))))
-        self.binBoundaries.append(len(theData))
-
+        if len(self.thisData) == 0:
+            return
+        if len(self.thisData) == 1:
+            self.classify(datasetLength)
+            return
         prevboundary = 0
-        for boundaryBin in range(len(self.binBoundaries)):
-            for entry in range(prevboundary, self.binBoundaries[boundaryBin]):
-                theData[entry][localDiscriminator] = boundaryBin
-            prevboundary = self.binBoundaries[boundaryBin]
+        for boundaryBin in range(len(self.boundaries[self.indexDiscriminated])):
+            for entry in range(prevboundary, boundaryBin):
+                self.thisData[entry][self.indexDiscriminated] = boundaryBin
+            prevboundary = boundaryBin
 
-        for i in range(len(self.binBoundaries)):
+        for i in range(len(self.boundaries[self.indexDiscriminated])):
             child = []
-            for entry in range(len(theData)):
-                if int(theData[entry][localDiscriminator]) == i:
-                    child.append(theData[entry])
-            self.children.append(DTree(deepcopy(child), self.maxDepth, deepcopy(self.depth), binSize, datasetLength))
+            for entry in range(len(self.thisData)):
+                if int(self.thisData[entry][self.indexDiscriminated]) == i:
+                    child.append(self.thisData[entry])
+            if child:
+                self.children.append(DTree(deepcopy(child),self.maxDepth, self.depth, len(child[0]), self.boundaries, self))
+
+    def determineEntropy(self, datasetLength):
+        self.entropy = setEntropy(self.thisData, datasetLength)
+        localMaxInformationGain = -(math.inf)
+        for i in range(datasetLength-1):
+            localEntropies = self.informationGain(i, len(self.boundaries[i]))
+            localEntropy = 0
+            for j in localEntropies:
+                localEntropy = localEntropy + j
+            # grab average
+            localEntropy = localEntropy/len(localEntropies)
+
+            informationGain = deepcopy(self.entropy) - localEntropy
+
+            if i != datasetLength-1:
+                if informationGain > localMaxInformationGain:
+                    localMaxInformationGain = informationGain
+                    self.indexDiscriminated = deepcopy(i)
+        
+        if float(localMaxInformationGain) == -0.0:
+            localMaxInformationGain = abs(localMaxInformationGain)
+
+        self.gain = localMaxInformationGain
+
+    def informationGain(self, variable, datasetLength):
+        count = {}
+
+        for i in range(datasetLength):
+            count[int(i)] = 0
+
+        for i in self.thisData:
+            length = len(self.thisData[0])-1
+            if int(i[length]) == 1:
+                count[i[variable]] += 1
+        entropy = []
+        for i in count:
+            entropy.append(calculateEntropy(count[i], len(self.thisData)))
+        return entropy
 
 
+def calculateEntropy(dataPoints, sizeofData):
+    intermediate1 = dataPoints / sizeofData
+    intermediate2 = dataPoints / sizeofData
 
+    logintermediate1 = 0
+    logintermediate2 = 0
 
-
-def calculateProbability(data, datasetLength, which):
-    p = {}
-    p[0] = 0
-    p[1] = 0
-
-    for i in range(len(data)):
-        if int(data[i][datasetLength - 1]) == 0:
-            p[0] += 1
-        if int(data[i][datasetLength - 1]) == 1:
-            p[1] += 1
-
-    probabilityT = p[1] / len(data)
-    probabilityF = p[0] / len(data)
-
-    if which:
-        return probabilityT
+    if intermediate1 == 0:
+        logintermediate1 = 0
+    elif intermediate1 == 1:
+        logintermediate1 = 1
     else:
-        return probabilityF
+        logintermediate1 = math.log2(intermediate1)
+
+    if intermediate2 == 0:
+        logintermediate2 = 0
+    elif intermediate2 == 1:
+        logintermediate2 = 1
+    else:
+        logintermediate2 = math.log2(intermediate2)
+
+    entropy = -(intermediate1) * logintermediate1 + \
+        -((intermediate2) * logintermediate2)
+    if entropy == -0.0:
+        entropy = abs(entropy)
+    return entropy
 
 
-def calculateEntropy(data, datasetLength):
+def setEntropy(data, datasetLength):
     _entropy = {}
     _entropy[0] = 0
     _entropy[1] = 0
@@ -176,34 +196,34 @@ def calculateEntropy(data, datasetLength):
         logintermediate2 = 0
     else:
         logintermediate2 = math.log2(intermediate2)
-    entropy = -(intermediate1) * logintermediate1 - ((intermediate2) * logintermediate2)
+    entropy = -(intermediate1) * logintermediate1 - \
+        ((intermediate2) * logintermediate2)
     return entropy
 
 def check(tree, dataLength):
-    if tree.Leaf == False:
+    if tree.Leaf == False and tree.thisData:
         for i in tree.children:
             check(i, dataLength)
     if tree.Leaf == True:
-        if tree.classifiedAs == "+":
-            for i in tree.bin:
+        if tree.classifiedAs == 1:
+            for i in tree.thisData:
                 Positive.append(i)
         else:
-            for i in tree.bin:
+            for i in tree.thisData:
                 Negative.append(i)
-def returnCheck():
-    classified = classifier()
-    classified.positive = deepcopy(Positive)
-    classified.negative = deepcopy(Negative)
+def checkHandler(tree, dataLength):
+    check(tree, dataLength)
 
-    return classified
+    PositiveCount = 0
+    NegativeCount = 0
+    for i in range(len(Positive)):
+        if int(Positive[i][dataLength-1]) == 1:
+            PositiveCount +=1
+    for j in range(len(Negative)):
+        if int(Negative[j][dataLength-1]) == 0:
+            NegativeCount +=1
+    totalAccuracy = PositiveCount + NegativeCount
 
-def ListProb(list, dataLength):
-    positive = 0
-    negative = 0
+    totalAccuracy = totalAccuracy/ (len(Negative)+ len(Positive))
 
-    for i in list:
-        if int(i[dataLength-1]) == 1:
-            positive +=1
-
-    percentage = float(positive/len(list))
-    return percentage
+    return totalAccuracy
