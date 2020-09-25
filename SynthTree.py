@@ -22,12 +22,12 @@ previously_used = {}
 
 
 class DTree:
-    def __init__(self, data, maxDepth, parentDepth, datasetLength, boundaries, Parent):
+    def __init__(self, data, maxDepth, parentDepth, datasetLength, boundaries, previouslyUsed, Parent):
         self.thisData = deepcopy(data)
         self.maxDepth = maxDepth
         self.depth = 1 + parentDepth
         self.boundaries = boundaries
-
+        self.previouslyUsed = deepcopy(previouslyUsed)
         self.indexDiscriminated = -1
         self.entropy = -(math.inf)
         self.gain = -(math.inf)
@@ -81,19 +81,15 @@ class DTree:
                         Positive.append(deepcopy(self.thisData[j]))
                     else:
                         Negative.append(deepcopy(self.thisData[j]))
-            self.children.append(DTree(deepcopy(Negative),self.maxDepth, self.depth, len(Negative[0]), self.boundaries, self))
-            self.children.append(DTree(deepcopy(Positive),self.maxDepth, self.depth, len(Positive[0]), self.boundaries, self))
+            self.children.append(DTree(deepcopy(Negative),self.maxDepth, self.depth, len(Negative[0]), self.boundaries, self.previouslyUsed, self))
+            self.children.append(DTree(deepcopy(Positive),self.maxDepth, self.depth, len(Positive[0]), self.boundaries, self.previouslyUsed, self))
             return
         if len(self.thisData) == 0:
             return
         if len(self.thisData) == 1:
             self.classify(datasetLength)
             return
-        prevboundary = 0
-        for boundaryBin in range(len(self.boundaries[self.indexDiscriminated])):
-            for entry in range(prevboundary, boundaryBin):
-                self.thisData[entry][self.indexDiscriminated] = boundaryBin
-            prevboundary = boundaryBin
+      
 
         for i in range(len(self.boundaries[self.indexDiscriminated])):
             child = []
@@ -101,7 +97,7 @@ class DTree:
                 if int(self.thisData[entry][self.indexDiscriminated]) == i:
                     child.append(self.thisData[entry])
             if child:
-                self.children.append(DTree(deepcopy(child),self.maxDepth, self.depth, len(child[0]), self.boundaries, self))
+                self.children.append(DTree(deepcopy(child),self.maxDepth, self.depth, len(child[0]), self.boundaries, self.previouslyUsed, self))
 
     def determineEntropy(self, datasetLength):
         self.entropy = setEntropy(self.thisData, datasetLength)
@@ -117,14 +113,19 @@ class DTree:
             informationGain = deepcopy(self.entropy) - localEntropy
 
             if i != datasetLength-1:
-                if informationGain > localMaxInformationGain:
-                    localMaxInformationGain = informationGain
-                    self.indexDiscriminated = deepcopy(i)
+                if i not in self.previouslyUsed:
+                    if informationGain > localMaxInformationGain:
+                        if self.indexDiscriminated:
+                            localMaxInformationGain = informationGain
+                            self.indexDiscriminated = deepcopy(i)
+                    else:
+                        continue
         
         if float(localMaxInformationGain) == -0.0:
             localMaxInformationGain = abs(localMaxInformationGain)
 
         self.gain = localMaxInformationGain
+        self.previouslyUsed.append(self.indexDiscriminated)
 
     def informationGain(self, variable, datasetLength):
         count = {}

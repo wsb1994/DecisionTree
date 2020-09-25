@@ -52,7 +52,7 @@ def getBoundaries(boundaries, dataSetLength, data):
                        boundaries[column][localBound] = data[localBound][column]
             
 
-data1 = Tuple.TupleObject('synthetic-1.csv')
+data1 = Tuple.TupleObject('synthetic-4.csv')
 data1Reference = deepcopy(data1)
 
 data2 = Tuple.TupleObject('pokemonStats.csv')
@@ -64,9 +64,9 @@ getBoundaries(boundaries, dataLength, data1Reference.list)
 
 boundaries2 = discretizer(data2.list, 45, binsize)
 getBoundaries(boundaries2, 45, data2Reference.list)
-
-SynthTree1 = SynthTree.DTree(data1.list, 2, -1, dataLength, boundaries, None)
-SynthTree2 = SynthTree.DTree(data2.list, 3, -1, 45, boundaries2, None)
+discretizedNodes = []
+SynthTree1 = SynthTree.DTree(data1.list, 2, -1, dataLength, boundaries, discretizedNodes, None)
+SynthTree2 = SynthTree.DTree(data2.list, 3, -1, 45, boundaries2, discretizedNodes, None)
 
 accuracy = SynthTree.checkHandler(SynthTree1, dataLength)
 SynthTree.Positive = []
